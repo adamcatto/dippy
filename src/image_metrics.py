@@ -1,5 +1,8 @@
-import numpy as np
+from typing import Union
 
+import numpy as np
+import cv2
+#import image_slicer
 
 
 def luminance_similarity(img_1, img_2, regularization_term=0.01, dynamic_range=255):
@@ -32,3 +35,33 @@ def ssim(img_1, img_2, luminance_weight, contrast_weight, structure_weight):
     return luminance * contrast * structure
 
 
+def _compute_tile_eme_score(tile, regularization_term=0.01):
+    contrast_difference = np.max(tile) / (np.min(tile) + regularization_term)
+    eme = 20 * np.log(contrast_difference)
+    return eme
+
+
+def compute_eme_score(img: np.array, block_size, regularization_term: float = 0.01) -> float:
+    if isinstance(block_size, int):
+        block_size = (block_size, block_size)
+    
+    max_eme = 0
+    # create block_size[0] x block_size[1] tiles
+    #M = img.shape[0] // block_size[0]
+    #N = img.shape[1] // block_size[1]
+    # note: if instead want tiles to have block_size, simply let M, N = block_size
+    M, N = block_size
+    tiled_img = [img[x:x+M,y:y+N] for x in range(0,img.shape[0],M) for y in range(0,img.shape[1],N)]
+    
+    eme_scores = [_compute_tile_eme_score(tile, regularization_term) for tile in tiled_img]
+    eme_score = np.mean(eme_scores)
+    print(len(eme_scores))
+    return eme_score / (block_size[0] * block_size[1])
+
+
+def test_image_metrics(path='../input_data/tunnel_1.png'):
+    img = cv2.imread(path)
+    print(compute_eme_score(img, 4))
+
+
+#test_image_metrics(path='../input_data/test_for_eme.png')
