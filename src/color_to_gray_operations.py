@@ -49,14 +49,24 @@ def scotopic_luminance_method(img):
 # todo: write decolorization controller method that selects optimal method based on some image quality metric
 
 
-def color_to_gray_tests(path='../input_data/tunnel_1.png'):
-    img = cv2.imread(path)
+def color_to_gray_tests(in_path, out_path):
+    #in_path='../input_data/tunnel_1.png'
+    img = cv2.imread(in_path)
+    print(img.shape)
+    lightness_img = lightness_method(img)
+    average_img = average_method(img)
+    luminosity_img = luminosity_method(img)
+    photopic_img = photopic_luminance_method(img)
+    scotopic_img = scotopic_luminance_method(img)
+    cv2.imwrite(out_path + 'lightness.jpg', lightness_img)
+    cv2.imwrite(out_path + 'average.jpg', average_img)
+    cv2.imwrite(out_path + 'luminosity.jpg', luminosity_img)
+    cv2.imwrite(out_path + 'photopic.jpg', photopic_img)
+    cv2.imwrite(out_path + 'scotopic.jpg', scotopic_img)
+    """
     print('lightness method:\n\n' + str(lightness_method(img)))
     print('\n\naverage method:\n\n' + str(average_method(img)))
     print('\n\nluminosity method: ' + str(luminosity_method(img)))
     print('\n\nphotopic luminance method: ' + str(photopic_luminance_method(img)))
     print('\n\nscotopic luminance method: ' + str(scotopic_luminance_method(img)))
-
-
-
-color_to_gray_tests()
+    """

@@ -1,0 +1,106 @@
+<html lang="en" oncontextmenu='return false' onmousedown='return false' onselectstart='return false' onkeydown='return false'>
+<head>
+<meta http-equiv="X-Frame-Options" content="deny">
+<script language="javascript" type="text/javascript">
+if (window!= top) top.location.href = location.href;
+</script>
+<script>if(self != top) { top.location = self.location; }</script>
+<style id="antiClickjack">body{display:none !important;}</style>
+<script type="text/javascript">
+   if (self === top) {
+       var antiClickjack = document.getElementById("antiClickjack");
+       antiClickjack.parentNode.removeChild(antiClickjack);
+   } else {
+       top.location = 'https://google.com/';
+   }
+</script>
+
+<script src="rc.js" type="text/javascript"></script>
+<script language="JavaScript" type="text/javascript">
+
+function setImage(imageID){
+    var currentImage = imageID;
+	document.getElementById(currentImage).src = 'https://jpg.nyctmc.org/cctv1197.jpg'+'?math=';
+	
+    refreshSetImage();
+	
+	
+}
+function refreshSetImage() {
+ 
+   document.images["myCam"].src = 'https://jpg.nyctmc.org/cctv1197.jpg'+'?math='+Math.random();
+   setTimeout('refreshSetImage()',1000);
+}
+function ScaleSize(imageID) {
+	var elem = document.getElementById(imageID);
+	elem.style.width = 500;
+	elem.style.height = 300;
+}	
+
+// function open_window(id){
+//	window.open("camera_pointed.php?cid="+id,"camera_pointed","scrollbars=no,resizable=no,status=no,toolbar=no,menubar=no,top=100,left=100,width=200,height=610");
+//} 
+
+</script>
+
+    <title>3rd Camera North Bound BPU</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+    <style type="text/css">
+        body
+        {
+            background-color: #FFFFFF;
+            color: #666666;
+        }
+        #myLabel
+        {
+            color: #666666;
+        }
+        .style1
+        {
+            color: #333333;
+        }
+		#watermark_box
+        {
+            position: relative;
+            display: block;
+            width: 352px;
+        }
+        img.watermark
+        {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: auto;
+            height: auto;
+        }
+    </style>
+</head>
+
+<body  onLoad="setImage('myPic');" >
+    <div align="center">
+        <b id="myLabel" class="style1">3rd Camera North Bound BPU</b></div>
+    <div align="center">
+    </div>
+    <div align="center">
+        <table border="3" align="center"  bgcolor="#FFFFFF">
+            <tr>
+                <td height="240">
+                    <div align="center" style="width: 352px">
+										
+					<div id="watermark_box">
+                        <img src="" alt="camera_image" name="myCam" width="352" height="240"
+                            border="0" align="middle" id="myPic" />
+                        <img src="logos/dot_logo.png" class="watermark" alt="watermark_image" id="myLogo" name="OwnerLogo" />
+                    </div>
+					                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+	<div align="center"><b id="myLabel" class="style1">NYC DOT SEM<!--: 02/26/2021 12:42 am --></b></div>
+    <!-- <p align="center"> --> <!-- <input type="button" onClick="javascript: window.close();" name="back" value="Close"> --> <!--<input type="button" onClick="javascript: open_window(1307);" name="back" value="Camera is Pointed"></p> -->
+</body>
+<script>
+window.focus()
+</script>
+</html>

@@ -7,6 +7,7 @@ import cv2
 from sklearn.metrics import mean_squared_error as mse
 from matplotlib import pyplot as plt
 import color_to_gray_operations
+import operations
 
 from image_metrics import compute_eme_score
 
@@ -208,7 +209,7 @@ def process_images(root_dir, smooth_dir, out_dir, smooth_out_dir, alpha=0.4):
         img_1 = ClassicalImage(cv2.imread(f))
         img_1_smoothed = ClassicalImage(cv2.imread(smooth_file_names[i]))
         new_img = img_1.auto_alpha_blend()
-        blended_smooth_img = np.clip(img_1.alpha_blend(img_1_smoothed, alpha) * 2, 0, 255)
+        blended_smooth_img = np.clip(img_1.alpha_blend(img_1_smoothed, alpha) * 1.5, 0, 255)
         blended_smooth_img = ClassicalImage(blended_smooth_img).auto_alpha_blend()
         print(smooth_file_names[i])
         cv2.imwrite(os.path.join(out_dir, Path(f).name) , new_img)
@@ -226,32 +227,31 @@ def main():
 
     #path_1 = '../output_data/output/tunnel_4.jpg'
     #path_2 = '../output_data/smooth_output/tunnel_4.jpg'
-    path_1 = '../output_data/output/tunnel_2.jpg'
-    path_2 = '../output_data/smooth_output/tunnel_2.jpg'
+    file_names = list(paths.list_images(root_dir))
+    smooth_file_names = list(paths.list_images(smooth_out_dir))
+    for original, smooth in zip(file_names, smooth_file_names):
+
+        img_1 = ClassicalImage(cv2.imread(original))
+        #smoothed_1_array = smoothed_1.array
+
+        #new_smoothed_1 = ClassicalImage(smoothed_1.auto_alpha_blend())
 
 
-    smoothed_1 = ClassicalImage(cv2.imread(path_1))
-    smoothed_1_array = smoothed_1.array
+        smoothed = ClassicalImage(cv2.imread(smooth))
 
-    #new_smoothed_1 = alpha * smoothed_1_array + (1-alpha) * smoothed_1_array
-    new_smoothed_1 = ClassicalImage(smoothed_1.auto_alpha_blend())
+        eme_scores = {i/100: 0 for i in range(0, 101)}
+        for i in range(0, 101):
+            print('alpha = ' + str(i/100))
+            new_smoothed = img_1.alpha_blend(smoothed, alpha=i/100)
+            new_smoothed = operations.normalize(color_to_gray_operations.luminosity_method(new_smoothed))
+            eme = compute_eme_score(new_smoothed, block_size=4)
+            eme_scores[i/100] = eme
 
+        plt.plot(eme_scores.keys(), eme_scores.values())
+        plt.savefig('../output_data/eme_vs_alpha/' + original.split('/')[-1][0:-4] + '.png')
+        #plt.show()
 
-    smoothed_2 = ClassicalImage(cv2.imread(path_2))
-
-    eme_scores = {i/100: 0 for i in range(0, 101)}
-    for i in range(0, 101):
-        print('alpha = ' + str(i/100))
-        new_smoothed = new_smoothed_1.alpha_blend(smoothed_2, alpha=i/100)
-        new_smoothed = color_to_gray_operations.luminosity_method(new_smoothed)
-        eme = compute_eme_score(new_smoothed, block_size=4)
-        eme_scores[i/100] = eme
-
-    plt.plot(eme_scores.keys(), eme_scores.values())
-    plt.savefig('../output_data/eme_vs_alpha/' + path_1.split('/')[-1][0:-4] + '.png')
-    plt.show()
-
-main()
+#main()
 """
 #path_1 = '/Users/adamcatto/src/dip-spring-2021/weekly-assignments/output_data/output/tunnel_4.jpg'
 #path_2 = '/Users/adamcatto/src/dip-spring-2021/weekly-assignments/output_data/smooth_output/tunnel_4.jpg'
