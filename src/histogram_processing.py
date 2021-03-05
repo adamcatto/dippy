@@ -5,7 +5,8 @@ from skimage import morphology
 from skimage.filters import rank
 
 import base
-from color_to_gray_operations import luminosity_method
+from color_to_gray_operations import luminosity_method, average_method
+from image_metrics import compute_eme_score
 
 
 def compute_image_histogram(img):
@@ -204,6 +205,47 @@ def local_histogram_equalization(img, disk_size):
     return equalized_img
 
 
+def average_histogram_equalization(img):
+    gray_img = luminosity_method(img)
+    gray_hist = compute_image_histogram(gray_img)
+    gray_img_mapping = get_hist_eq_mapping_from_image(gray_img)
+    #gray_img_equalized = np.vectorize(gray_img_mapping.__getitem__)(gray_img)
+    b, g, r = cv2.split(img)
+
+    b_eq = np.vectorize(gray_img_mapping.__getitem__)(b)
+    g_eq = np.vectorize(gray_img_mapping.__getitem__)(g)
+    r_eq = np.vectorize(gray_img_mapping.__getitem__)(r)
+
+    reconstructed = np.dstack([b_eq, g_eq, r_eq])
+    return reconstructed
+    #bgr_hists = tuple(compute_image_histogram(i) for i in bgr)
+    #average_hist = sum([x[0] for x in bgr_hists]) / 3
+
+
+def alternative_average_hist_eq(img):
+    bgr = cv2.split(img)
+    bins = [x for x in range(0, 257)]
+    total_pixels = img.shape[0] * img.shape[1]
+    hists = [compute_image_histogram(x)[0] for x in bgr]
+    average_hist = (hists[0] + hists[1] + hists[2]) / 3
+    pdf = average_hist / total_pixels
+    cdf = compute_cdf_from_pdf(pdf)
+    hist_eq_mapping = get_hist_eq_mapping_from_cdf(cdf, bins)
+
+    b_eq = np.vectorize(hist_eq_mapping.__getitem__)(bgr[0])
+    g_eq = np.vectorize(hist_eq_mapping.__getitem__)(bgr[1])
+    r_eq = np.vectorize(hist_eq_mapping.__getitem__)(bgr[2])
+
+    reconstructed = np.dstack([b_eq, g_eq, r_eq])
+    return reconstructed
+
+
+    
+
+
+
+
+
 def stretch_piecewise_linear(img, threshold):
     pass
 
@@ -218,8 +260,9 @@ def stretch_piecewise_non_linear(img, threshold):
 
 
 def histogram_processing_tests(out_path='../output_data/histogram_processing/'):
-    #img = cv2.imread('../output_data/smooth_output/tunnel_1.png')
-    img = cv2.imread('/Users/adamcatto/src/L0-Smoothing/src/output_tunnels/tunnel_1.png')
+    img = cv2.imread('../output_data/smooth_output/tunnel_1.png')
+    #img = cv2.imread('/Users/adamcatto/src/L0-Smoothing/src/output_tunnels/tunnel_1.png')
+    original_eme = compute_eme_score(luminosity_method(img), 10)
     #img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     #print(img)
     if len(img.shape) == 3:
@@ -228,19 +271,42 @@ def histogram_processing_tests(out_path='../output_data/histogram_processing/'):
     else:
         cdfs = compute_image_cdf(img)[0]
 
+    
+
     naive_eq_mapping = get_naive_hist_eq_mapping_from_cdf(img, cdfs)
     naive_equalized_img = stretch_histogram(get_image_from_mapping(img, naive_eq_mapping))
+    naive_equalized_img_eme = compute_eme_score(luminosity_method(naive_equalized_img), 10)
     #print(naive_equalized_img)
     equalized_global = equalize_histogram(img)
+    equalized_global_eme = compute_eme_score(luminosity_method(equalized_global), 10)
     #equalized_global = 255 - base.normalize_by_channel(img - equalized_global)
     bi_equalized = bi_histogram_equalization(img)
+    bi_equalized_eme = compute_eme_score(luminosity_method(bi_equalized), 10)
     #bi_equalized = stretch_histogram(img - bi_equalized)
     equalized_local = local_histogram_equalization(img, 200)
+    equalized_local_eme = compute_eme_score(luminosity_method(equalized_local), 10)
+
+    equalized_average = average_histogram_equalization(img)
+    equalized_average_eme = compute_eme_score(luminosity_method(equalized_average), 10)
+
+    alternative_equalized_average = alternative_average_hist_eq(img)
+    alternative_equalized_average_eme = compute_eme_score(luminosity_method(alternative_equalized_average), 10)
+    
+    print('original eme: ' + str(original_eme))
+    print('naive eme: ' + str(naive_equalized_img_eme))
+    print('global eme: ' + str(equalized_global_eme))
+    print('bihistogram equalized eme: ' + str(bi_equalized_eme))
+    print('local eme: ' + str(equalized_local_eme))
+    print('average method eme: ' + str(equalized_average_eme))
+    print('alternative average eme: ' + str(alternative_equalized_average_eme))
+
 
     cv2.imwrite(out_path + 'equalized_global.png', equalized_global)
     cv2.imwrite(out_path + 'naive_equalized.png', naive_equalized_img)
     cv2.imwrite(out_path + 'bi_equalized.png', bi_equalized)
     cv2.imwrite(out_path + 'equalized_local.png', equalized_local)
+    cv2.imwrite(out_path + 'equalized_average.png', equalized_average)
+    cv2.imwrite(out_path + 'alternative_equalized_average.png', alternative_equalized_average)
 
 
 histogram_processing_tests()
