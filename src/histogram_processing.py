@@ -259,7 +259,7 @@ def stretch_piecewise_non_linear(img, threshold):
 ####################
 
 
-def histogram_processing_tests(out_path='../output_data/histogram_processing/'):
+def experiments(out_path='../output_data/histogram_processing/'):
     img = cv2.imread('../output_data/smooth_output/tunnel_1.png')
     #img = cv2.imread('/Users/adamcatto/src/L0-Smoothing/src/output_tunnels/tunnel_1.png')
     original_eme = compute_eme_score(luminosity_method(img), 10)
@@ -309,4 +309,4 @@ def histogram_processing_tests(out_path='../output_data/histogram_processing/'):
     cv2.imwrite(out_path + 'alternative_equalized_average.png', alternative_equalized_average)
 
 
-histogram_processing_tests()
+#experiments()

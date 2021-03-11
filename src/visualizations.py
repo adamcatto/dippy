@@ -5,8 +5,20 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import cv2
 
+import color_to_gray_operations
 
-VIZ_PATH = '../output_data/visualizations/smooth_intensities/'
+
+VIZ_PATH = '../output_data/visualizations/gray_intensities/'
+
+
+def visualize_grayscale_intensities(img, out_path):
+    img_x, img_y = np.mgrid[0: img.shape[0], 0: img.shape[1]]
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    ax.plot_surface(img_x, img_y, img, rstride=1, cstride=1, cmap=plt.cm.jet,
+            linewidth=0)
+    plt.savefig(out_path + 'surface.png')
+    plt.close()
 
 
 def visualize_color_intensities(color_img, out_path):
@@ -51,4 +63,12 @@ def visualization_tests(path='../input_data/tunnel_1.png'):
     img = cv2.imread(path)
     visualize_color_intensities(img, out_path=VIZ_PATH)
 
+
+def experiments(path='../input_data/noisy_segments/honeycomb_1.png'):
+    img = cv2.imread(path)
+    img = color_to_gray_operations.luminosity_method(img)
+    visualize_grayscale_intensities(img, out_path=VIZ_PATH)
+
+
+experiments()
 #visualization_tests()
