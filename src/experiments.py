@@ -13,7 +13,6 @@ def main(PATH='../input_data/noisy_segments/'):
         to_read = os.path.join(PATH, f)
         img = cv2.imread(to_read)
         grayscale = color_to_gray_operations.luminosity_method(img)
-        grayscale = 255 - grayscale
         cv2.imwrite('../input_data/noisy_segments/' + f, grayscale)
 
     #b = base.make_bool(b, 200)
