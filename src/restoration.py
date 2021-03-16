@@ -230,10 +230,11 @@ def test():
 
     ######## APPLY FILTERS ########
     for j in range(7, 67, 10):
-        for filter_type in [ 'local_adaptive', 'arithmetic', 'geometric', 'harmonic', 'contraharmonic']:
+        #for filter_type in [ 'local_adaptive', 'arithmetic', 'geometric', 'harmonic', 'contraharmonic']:
+        for filter_type in ['local_adaptive']:
             print('applying ' + filter_type + ' filter with window height/width = ' + str(j))
             if filter_type == 'local_adaptive':
-                new_img = apply_mean_filter(img, window_size=(j, j), filter_type='local_adaptive', global_noise_variance=noise_sd**2)
+                new_img = apply_mean_filter(img, window_size=(j, j), filter_type='local_adaptive', global_noise_variance=noise_sd)
                 cv2.imwrite('../output_data/denoised/_tunnel_1' + filter_type + '_' + str(j) + '.png', new_img)
             elif filter_type == 'contraharmonic':
                 for op in range(-2, 2):
@@ -247,6 +248,8 @@ def test():
             
 
     #dst = cv2.fastNlMeansDenoisingColored(img,None,10,10,7,21)
+
+test()
 
 
 def add_noise_test():
@@ -318,7 +321,35 @@ def stretch_histograms(dir='../output_data/denoised/'):
         cv2.imwrite('../output_data/denoised_stretched/' + f, stretched)
 
 
-stretch_histograms()
-#estimate_noise_model_test()
-#add_noise_test()
-#test()
+#### ORDER STATISTICS ####
+def median_filter(window):
+    flattened_array = np.ravel(window)
+    return np.median(flattened_array)
+
+
+def max_filter(window):
+    flattened_array = np.ravel(window)
+    return np.max(flattened_array)
+
+
+def min_filter(window):
+    flattened_array = np.ravel(window)
+    return np.min(flattened_array)
+
+
+def midpoint_filter(window):
+    min_ = min_filter(window)
+    max_ = max_filter(window)
+    return (max_ + min_) / 2
+
+
+def alpha_trimmed_mean_filter(window, d):
+    height, width = window.shape
+    sorted_flattened_array = np.array(list(sorted(np.ravel(window))))
+    num_to_remove = round(d * len(sorted_flattened_array))
+    relevant_values = sorted_flattened_array[num_to_remove: len(sorted_flattened_array) - num_to_remove]
+    return (1 / ((height * width) - (num_to_remove * 2))) * np.sum(relevant_values)
+
+
+def adaptive_median_filter(window, max_window_size):
+    pass
