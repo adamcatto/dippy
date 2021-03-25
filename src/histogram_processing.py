@@ -66,7 +66,7 @@ def compute_image_cdf(img):
 
 def stretch_histogram(img):
     max_value, min_value = np.max(img), np.min(img)
-    stretched_hist = 255 * (img - min_value) / (max_value - min_value)
+    stretched_hist = 255 * (img - min_value) / (0.01 + max_value - min_value)
     return stretched_hist
 
 

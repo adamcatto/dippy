@@ -14,6 +14,13 @@ from image_metrics import compute_eme_score
 
 ######## helper functions ########
 
+def alpha_blend(img, other, alpha):
+    assert all((type(alpha) == float, alpha >= 0, alpha <= 1))
+    _first, _second = crop_match(img, other)
+    _first = alpha * _first
+    _second = (1 - alpha) * _second
+    return _first + _second
+
 def make_bool(img_array, threshold=0):
         bool_array = img_array
         if img_array.dtype.name != 'bool':

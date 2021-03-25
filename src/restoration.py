@@ -10,6 +10,7 @@ from skimage.util import random_noise
 
 import histogram_processing
 import color_to_gray_operations
+from color_to_gray_operations import luminosity_method
 
 
 NOISE_PATH = '../input_data/noisy_segments/'
@@ -219,7 +220,7 @@ def add_exponential_noise(img):
     return img + exponential_noise_img
 
 
-def test():
+def test_mean_filters():
     #img = cv2.imread('../nyc_tunnel/1_nyc_tunnel.png')
     img = cv2.imread('../input_data/tunnels/tunnel_1.png')
     img = color_to_gray_operations.luminosity_method(img)
@@ -248,8 +249,6 @@ def test():
             
 
     #dst = cv2.fastNlMeansDenoisingColored(img,None,10,10,7,21)
-
-test()
 
 
 def add_noise_test():
@@ -353,3 +352,32 @@ def alpha_trimmed_mean_filter(window, d):
 
 def adaptive_median_filter(window, max_window_size):
     pass
+
+
+def apply_order_statistic_filter(img, window_size, filter_function: callable = max_filter, d=None):
+    window_height, window_width = window_size
+    image_height, image_width = img.shape
+    restored_img = np.zeros(img.shape)
+    
+    for row_index in range(window_height // 2, image_height - window_height // 2):
+        for column_index in range(window_width // 2, image_width - (window_width // 2)):
+            #print(row_index - window_height, row_index + window_height)
+            window = img[row_index - window_height//2: row_index + window_height//2, column_index - window_width//2: column_index + window_width//2]
+            restored_img[row_index, column_index] = filter_function(window)
+
+    return restored_img
+
+
+def test_order_statistic_filter(img_file='../input_data/grayscale_tunnels/grayscale_tunnel_1.png', window_size=(11, 11), filter_function=max_filter, d=None):
+    img = luminosity_method(cv2.imread(img_file))
+    restored = apply_order_statistic_filter(img=img, window_size=window_size, filter_function=filter_function)
+    return restored
+
+
+#r = test_order_statistic_filter()
+r = luminosity_method(cv2.imread('../output_data/order_stat_filter/max_filter.png'))
+
+r_mean, r_sd, r_hist, r_bins = estimate_noise_parameters(r)
+img = apply_mean_filter(r, window_size=(27, 27), filter_type='local_adaptive', global_noise_variance=r_sd)
+
+cv2.imwrite('../output_data/order_stat_filter/max_then_adaptive_mean.png', img)

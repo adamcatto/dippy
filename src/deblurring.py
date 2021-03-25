@@ -1,12 +1,17 @@
+import os
+
 import numpy as np
+from matplotlib import pyplot as plt
 import cv2
 import skimage
+from skimage import io
 from skimage.filters import gaussian
 from scipy.fftpack import dct
 from fcmeans import FCM
 
 import histogram_processing
 from color_to_gray_operations import luminosity_method
+from base import alpha_blend, make_bool
 
 
 """
@@ -66,6 +71,7 @@ def compute_img_blurriness(img):
 
 def segment_blur_map(blur_map):
     fcm = FCM(n_clusters=2)
+    blur_map = blur_map[..., np.newaxis]
     fcm.fit(blur_map)
     seg = fcm.predict(blur_map)
     return seg
@@ -88,4 +94,63 @@ def main():
     #cv2.imwrite('../output_data/deblur/local/javaran-book-segmented.png', segmented)
 
 
-main()
+def construct_heatmaps(dir='../output_data/deblur/local/'):
+    files = os.listdir(dir)
+
+    for f in files:
+        print(f)
+        if f[-4] != '.':
+            continue
+        f_ = os.path.join(dir, f)
+        image = io.imread(f_)
+        m = np.mean(np.ravel(image))
+        for i, row in enumerate(image):
+            for j, col in enumerate(row):
+                if i < 47 or j < 47: 
+                    image[i][j] = m
+
+        cv2.imwrite('../output_data/deblur/local/' + f, image)
+        heatmap = cv2.applyColorMap(image, cv2.COLORMAP_JET)
+        
+        cv2.imwrite(dir + 'heatmap/' + f, heatmap)
+
+
+def test_blend_smooth_with_segment(alpha=0.75):
+    smooth_file = '../input_data/L0-smooth/tunnel_1.png'
+    segment_file = '../output_data/edge-segmented/tunnel_1.png'
+    smooth_img = cv2.imread(smooth_file)
+    segment_img = cv2.imread(segment_file)
+    blended = alpha_blend(smooth_img, segment_img, alpha)
+    cv2.imwrite('../output_data/smooth_segment_blend/tunnel_1.png', blended)
+
+
+def test_overlay_original_on_smoothed():
+    smooth_file = '../input_data/L0-smooth/tunnel_1.png'
+    segment_file = '../output_data/edge-segmented/tunnel_1_rolling.png'
+    original_file = '../output_data/edge-segmented/rolling_guided.png'
+
+    smooth_img = cv2.imread(smooth_file)
+    segment_img = make_bool(luminosity_method(cv2.imread(segment_file)), threshold=100)
+    original_img = cv2.imread(original_file)
+
+    for i, row in enumerate(segment_img):
+        for j, col in enumerate(row):
+            if segment_img[i, j]:
+                smooth_img[i, j] = original_img[i, j]
+
+    return smooth_img
+
+
+"""
+bm = cv2.imread('../output_data/deblur/local/gray_tunnel_1.png')
+s = segment_blur_map(bm)
+print(s)
+"""
+overlay = test_overlay_original_on_smoothed()
+cv2.imwrite('../output_data/smooth_segment_blend/overlay_smooth_rolling.png', overlay)
+
+#test_blend_smooth_with_segment()
+
+#construct_heatmaps()
+
+#main()
