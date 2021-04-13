@@ -29,6 +29,15 @@ def make_bool(img_array, threshold=0):
         return bool_array
 
 
+def make_bool_numeric(img_array, threshold=0):
+    bool_array = img_array
+    if img_array.dtype.name != 'bool':
+        f = lambda x: 0 if x <= threshold else 255
+        bool_array = np.vectorize(f)(img_array)
+
+    return bool_array
+
+
 def compute_psnr(img: np.array, enhanced_img: np.array, dynamic_range=255):
     psnr = 10 * np.log10((dynamic_range - 1) ** 2 / mse(img, enhanced_img))
     return psnr

@@ -49,7 +49,8 @@ def main(img_file='../input_data/tunnels/tunnel_1.png', out_dir='../output_data/
     magnitude = 20 * np.log(np.abs(dft_shift.real) + 1)
     phase = dft_shift.imag
 
-    dims = int(img.shape[0] / 4), int(img.shape[1] / 4)
+    #dims = int(img.shape[0] / 8), int(img.shape[1] / 8)
+    dims = 5
     if isinstance(dims, int):
         dims = (dims, dims)
 
@@ -60,6 +61,8 @@ def main(img_file='../input_data/tunnels/tunnel_1.png', out_dir='../output_data/
 
     highpass_kernel = construct_highpass_filter(dims, dft_img.shape, start_x, start_y)
     highpass_fft_filtered = dft_shift * highpass_kernel
+    highpass_fft_filtered_magnitude = highpass_fft_filtered.real
+    highpass_fft_filtered_phase = highpass_fft_filtered.imag
 
     highpass_filtered = np.fft.ifft2(highpass_fft_filtered)
     # get magnitude
@@ -70,14 +73,18 @@ def main(img_file='../input_data/tunnels/tunnel_1.png', out_dir='../output_data/
 
     lowpass_kernel = construct_lowpass_filter(dims, dft_img.shape, start_x, start_y)
     lowpass_fft_filtered = dft_shift * lowpass_kernel
+    lowpass_fft_filtered_magnitude = lowpass_fft_filtered.real
+    lowpass_fft_filtered_phase = lowpass_fft_filtered.imag
 
     lowpass_filtered = np.fft.ifft2(lowpass_fft_filtered)
     # get magnitude
     lowpass_filtered = np.abs(lowpass_filtered.real)
     print(lowpass_filtered)
     
-    cv2.imwrite(os.path.join(out_dir, 'highpass_fft_filtered.png'), np.abs(highpass_fft_filtered.real))
-    cv2.imwrite(os.path.join(out_dir, 'lowpass_fft_filtered.png'), np.abs(lowpass_fft_filtered.real))
+    cv2.imwrite(os.path.join(out_dir, 'highpass_fft_filtered_magnitude.png'), np.abs(highpass_fft_filtered_magnitude))
+    cv2.imwrite(os.path.join(out_dir, 'lowpass_fft_filtered_magnitude.png'), np.abs(lowpass_fft_filtered_magnitude))
+    cv2.imwrite(os.path.join(out_dir, 'highpass_fft_filtered_phase.png'), np.abs(highpass_fft_filtered_phase))
+    cv2.imwrite(os.path.join(out_dir, 'lowpass_fft_filtered_phase.png'), np.abs(lowpass_fft_filtered_phase))
     cv2.imwrite(os.path.join(out_dir, 'lowpass_filter.png'), stretch_histogram(lowpass_kernel))
     cv2.imwrite(os.path.join(out_dir, 'highpass_filter.png'), stretch_histogram(highpass_kernel))
     cv2.imwrite(os.path.join(out_dir, 'magnitude.png'), magnitude)

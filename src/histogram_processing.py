@@ -1,6 +1,8 @@
+from __future__ import annotations
+from typing import Union, Tuple
+
 import numpy as np
 import cv2
-
 from skimage import morphology
 from skimage.filters import rank
 
@@ -9,7 +11,7 @@ from color_to_gray_operations import luminosity_method, average_method
 from image_metrics import compute_eme_score
 
 
-def compute_image_histogram(img):
+def compute_image_histogram(img: np.array) -> Union[Tuple[np.array, np.array], Tuple[Tuple[np.array, np.array], Tuple[np.array, np.array], Tuple[np.array, np.array]]]:
     if len(img.shape) == 2:
         hist, bins = np.histogram(img, bins=[x for x in range(0, 257)])
         return hist, bins

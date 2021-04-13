@@ -125,12 +125,17 @@ def test_blend_smooth_with_segment(alpha=0.75):
 
 
 def test_overlay_original_on_smoothed():
-    smooth_file = '../input_data/L0-smooth/tunnel_1.png'
-    segment_file = '../output_data/edge-segmented/tunnel_1_rolling.png'
+    #smooth_file = '../input_data/L0-smooth/tunnel_1.png'
+    #segment_file = '../output_data/edge-segmented/tunnel_1_rolling.png'
+    #original_file = '../output_data/edge-segmented/rolling_guided.png'
+
+    smooth_file = '../output_data/smooth_segment_blend/overlay_smooth_rolling.png'
+    segment_file = '/Users/adamcatto/SRC/dippy/output_data/frequency_domain/overlay_smooth_rolling/highpass_filtered.png'
     original_file = '../output_data/edge-segmented/rolling_guided.png'
 
+
     smooth_img = cv2.imread(smooth_file)
-    segment_img = make_bool(luminosity_method(cv2.imread(segment_file)), threshold=100)
+    segment_img = make_bool(luminosity_method(cv2.imread(segment_file)), threshold=20)
     original_img = cv2.imread(original_file)
 
     for i, row in enumerate(segment_img):
@@ -147,7 +152,8 @@ s = segment_blur_map(bm)
 print(s)
 """
 overlay = test_overlay_original_on_smoothed()
-cv2.imwrite('../output_data/smooth_segment_blend/overlay_smooth_rolling.png', overlay)
+#cv2.imwrite('../output_data/smooth_segment_blend/overlay_smooth_rolling.png', overlay)
+cv2.imwrite('../output_data/smooth_segment_blend/overlay_frequency_domain_highpass.png', overlay)
 
 #test_blend_smooth_with_segment()
 
