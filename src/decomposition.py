@@ -33,7 +33,7 @@ def slice_bit_planes(img, num_planes_to_keep):
 
     bit_planes = convert_img_to_bit_planes(img)
     bit_planes = bit_planes[0: num_planes_to_keep]
-    print(len(bit_planes))
+    #print(len(bit_planes))
     #print(bit_planes)
     #for j, bp in enumerate(bit_planes):
         #bit_planes[j] = bp * (2 ** (7 - j))
@@ -97,14 +97,14 @@ def compute_nms(ns, compared):
     ns: neighborhood_size
     """
     nms = np.zeros(compared.shape)
-    print(nms.shape)
+    #print(nms.shape)
 
     for _ in range(5):
         for i in range(ns, compared.shape[0] - ns):
             for j in range(ns, compared.shape[1] - ns):
                 if compared[i, j] > 0:
                     neighborhood = [1 if compared[i + x, j + y] > 0 else 0 for x in [-ns, 0, ns] for y in [-ns, 0, ns] ]
-                    print(neighborhood)
+                    #print(neighborhood)
                     if sum(neighborhood) >= round(len(neighborhood) / 2) + 1:
                         nms[i, j] = 1
                     else:
@@ -113,10 +113,10 @@ def compute_nms(ns, compared):
 
     return nms
 
-n = compute_nms(ns=1, compared=compared)
+#n = compute_nms(ns=1, compared=compared)
 
 
-cv2.imwrite('/Users/adamcatto/SRC/dippy/output_data/decomposition/motion/nms.png', stretch_histogram(n))
+#cv2.imwrite('/Users/adamcatto/SRC/dippy/output_data/decomposition/motion/nms.png', stretch_histogram(n))
 
 
 """

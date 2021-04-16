@@ -116,4 +116,36 @@ def run(img_type_list=[]):
 
 
 if __name__ == '__main__':
-    run()
+    #run()
+    img_file = '/Users/adamcatto/SRC/dippy/input_data/gray_tunnel_sequence/images/0018.png'
+    img = to_gray(cv2.imread(img_file))
+    out_dir = '/Users/adamcatto/SRC/dippy/output_data/test_output/'
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+    
+    # this method will automatically convert `img` to grayscale. set param `make_gray` = `False` if you don't want this
+    dft_img = to_frequency_domain(img)
+    dft_shift = np.fft.fftshift(dft_img)
+    magnitude = 20 * np.log(np.abs(dft_shift.real) + 1)
+    phase = dft_shift.imag
+
+    #dims = int(img.shape[0] / 8), int(img.shape[1] / 8)
+    dims = 41
+    if isinstance(dims, int):
+        dims = (dims, dims)
+
+    start_x = int((dft_img.shape[0] - dims[0]) / 2)
+    start_y = int((dft_img.shape[1] - dims[1]) / 2)
+
+    # highpass filtering
+
+    highpass_kernel = construct_highpass_filter(dims, dft_img.shape, start_x, start_y)
+    highpass_fft_filtered = dft_shift * highpass_kernel
+    highpass_fft_filtered_magnitude = highpass_fft_filtered.real
+    highpass_fft_filtered_phase = highpass_fft_filtered.imag
+
+    highpass_filtered = np.fft.ifft2(highpass_fft_filtered)
+    # get magnitude
+    highpass_filtered = np.abs(highpass_filtered.real)
+    print(highpass_filtered)
+    cv2.imwrite(os.path.join(out_dir, img_file[-8:]), highpass_filtered)
