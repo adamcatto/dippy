@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 from skimage import morphology
 from skimage.filters import rank
+from matplotlib import pyplot as plt
 
 import base
 from color_to_gray_operations import luminosity_method, average_method
@@ -24,6 +25,35 @@ def compute_image_histogram(img: np.array) -> Union[Tuple[np.array, np.array], T
     red_hist, red_bins = compute_image_histogram(r)
 
     return ((blue_hist, blue_bins), (green_hist, green_bins), (red_hist, red_bins)) # blue_bins = green_bins = red_bins
+
+
+def plot_histogram(source, out_file):
+    # -- source ~ image file
+    if isinstance(source, str):
+        img = luminosity_method(cv2.imread(source))
+        return plot_histogram(img, out_file)
+
+    # -- source ~ image
+    if isinstance(source, np.ndarray) and len(source.shape) != 1:
+        if len(source.shape) == 3:
+            source = luminosity_method(source)
+        hist, bins = compute_image_histogram(source)
+        return plot_histogram((hist, bins), out_file)
+
+    # -- source ~ histogram (np.array)
+    if isinstance(source, np.ndarray) and len(source.shape) == 1:
+        bins = np.array([i for i in range(len(source))])
+        return plot_histogram((hist, bins), out_file)
+    # -- source ~ tuple(hist, bins) (type: (np.array, np.array))
+    if isinstance(source, tuple):
+        hist, bins = source
+        fig = plt.figure()
+        if len(bins) != len(hist):
+            bins = bins[0:len(hist)]
+        plt.plot(bins, hist)
+        fig.savefig(out_file)
+    else:
+        raise Exception('Expected either a path to an image, an image array, a histogram, or a histogram-bins pair. Got none.')
 
 
 def compute_image_pdf(img):

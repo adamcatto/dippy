@@ -7,10 +7,14 @@ import cv2
 from numpy.lib import stride_tricks
 from scipy.stats import wasserstein_distance
 from skimage.util import random_noise
+from skimage.exposure import adjust_gamma
+from skimage.filters import gaussian
 
 import histogram_processing
+from histogram_processing import stretch_histogram
 import color_to_gray_operations
 from color_to_gray_operations import luminosity_method
+from base import alpha_blend
 
 
 NOISE_PATH = '../input_data/noisy_segments/'
@@ -374,6 +378,27 @@ def test_order_statistic_filter(img_file='../input_data/grayscale_tunnels/graysc
     return restored
 
 
+def bi_gamma_correction(img_file, thresh=180, lower_g=1.0, higher_g=1.0):
+    img = luminosity_method(cv2.imread(img_file))
+    #img = gaussian(img, sigma=2)
+    new_img = np.where(img < thresh, img, 2 * (img / np.log(img + 1)))
+    hist, bins = histogram_processing.compute_image_histogram(img)
+
+    new_img = histogram_processing.stretch_histogram(new_img)
+
+    histogram_processing.plot_histogram(img, out_file='../output_data/test_output/tunnel_hist_orig.png')
+    histogram_processing.plot_histogram(new_img, out_file='../output_data/test_output/tunnel_hist_equalized.png')
+    return new_img
+    
+
+
+if __name__ == '__main__':
+    bgc_img = bi_gamma_correction('../input_data/gray_tunnel_sequence/images/0021.png')
+    cv2.imwrite('../output_data/test_output/bi_gamma.png', bgc_img)
+    
+
+
+"""
 #r = test_order_statistic_filter()
 r = luminosity_method(cv2.imread('../output_data/order_stat_filter/max_filter.png'))
 
@@ -381,3 +406,4 @@ r_mean, r_sd, r_hist, r_bins = estimate_noise_parameters(r)
 img = apply_mean_filter(r, window_size=(27, 27), filter_type='local_adaptive', global_noise_variance=r_sd)
 
 cv2.imwrite('../output_data/order_stat_filter/max_then_adaptive_mean.png', img)
+"""

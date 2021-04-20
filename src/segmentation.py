@@ -184,18 +184,18 @@ def test_abstract_painting():
 
 def motion_segmentation(seed_img_file, in_dir, out_dir, threshold, num_frames, blur=None):
     # process the seed image
-    seed_img = lm(cv2.imread(seed_img_file))
-    seed_img = slice_bit_planes(seed_img, 4)
-
+    if seed_img_file is not None:
+        seed_img = lm(cv2.imread(seed_img_file))
+        seed_img = slice_bit_planes(seed_img, 4)
 
     def _prepare_filenames(in_dir, num_frames:Union[None, int]):
-        files = list(sorted(os.listdir(in_dir)))
+        files = os.listdir(in_dir)
         num_files = len(files)
         if not num_frames:
             num_frames = num_files
         else:
             assert num_frames < num_files
-        filenames = [os.path.join(in_dir, x) for x in files][0:num_frames]
+        filenames = list(sorted([os.path.join(in_dir, x) for x in files][0:num_frames]))
         return filenames
 
 
@@ -404,23 +404,24 @@ def motion_segmentation(seed_img_file, in_dir, out_dir, threshold, num_frames, b
         """
         pass
     
-    print('system 1:')
-    #system_1(seed_img=seed_img, filenames=filenames, out_dir='../output_data/segmentation/system_1/', threshold=threshold, num_frames=num_frames, blur=blur)
+    if seed_img_file is not None:
+        print('system 1:')
+        system_1(seed_img=seed_img, filenames=filenames, out_dir='../output_data/segmentation/system_1/', threshold=threshold, num_frames=num_frames, blur=blur)
     print('system 2:')
-    #system_2(filenames=filenames, out_dir='../output_data/segmentation/system_2/', threshold=threshold, blur=blur)
+    system_2(filenames=filenames, out_dir='../output_data/segmentation/system_2/', threshold=threshold, blur=blur)
     print('system 3:')
     system_3(filenames=filenames, out_dir='../output_data/segmentation/system_3/', threshold=threshold, blur=blur)
     print('system 3a:')
-    #system_3a(filenames=filenames, out_dir='../output_data/segmentation/system_3a/', threshold=threshold, blur=blur)
+    system_3a(filenames=filenames, out_dir='../output_data/segmentation/system_3a/', threshold=threshold, blur=blur)
     print('system 4:')
-    #system_4(filenames=filenames, out_dir='../output_data/segmentation/system_4/', threshold=threshold, blur=blur)
+    system_4(filenames=filenames, out_dir='../output_data/segmentation/system_4/', threshold=threshold, blur=blur)
 
 
 def main():
     motion_segmentation(seed_img_file='../input_data/gray_tunnel_sequence/images/0023.png', 
-                            in_dir='../input_data/gray_tunnel_sequence/images/',
+                            in_dir='../input_data/cleaned_gray_tunnel_sequence/',
                             out_dir='/Users/adamcatto/SRC/dippy/output_data/segmentation/', 
-                            threshold=30, num_frames=150, blur=None)
+                            threshold=40, num_frames=150, blur=None)
 
 
 def make_montages():
@@ -431,7 +432,7 @@ def make_montages():
             seg_path = '/Users/adamcatto/SRC/dippy/output_data/segmentation/system_' + str(i+1) +'/segmented/'
         else:
             seg_path = '/Users/adamcatto/SRC/dippy/output_data/segmentation/system_3a/segmented/'
-        seg_files = os.listdir(seg_path)
+        seg_files = list(sorted(os.listdir(seg_path)))
         
         for j, f in tqdm(enumerate(seg_files)):
             seg_img = lm(cv2.imread(os.path.join(seg_path, f)))
@@ -447,7 +448,7 @@ def make_montages():
 
 def rename_images_padded(in_dir):
     files = os.listdir(in_dir)
-    filenames = [os.path.join(in_dir, f) for f in files]
+    filenames = list(sorted([os.path.join(in_dir, f) for f in files]))
     for i, f in tqdm(enumerate(filenames)):
         img = cv2.imread(f)
         n = int(files[i][0:-4])
@@ -455,8 +456,8 @@ def rename_images_padded(in_dir):
         cv2.imwrite(os.path.join(in_dir, n + '.png'), img)
         os.remove(f)
 
-#main()
-#make_montages()
+main()
+make_montages()
 """
 img = lm(cv2.imread('../input_data/gray_tunnel_sequence/images/0023.png'))
 img = stretch_histogram(np.log(img + 1))
@@ -468,6 +469,6 @@ cv2.imwrite('/Users/adamcatto/SRC/dippy/output_data/test_output/log_stretch_0023
 
 #test_abstract_painting()
 
-run_experiments(config)
+#run_experiments(config)
 
 # todo: make experiments function that loops over all images and applies all segmentation methods to each of them
