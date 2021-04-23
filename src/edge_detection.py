@@ -13,91 +13,210 @@ from tqdm import tqdm
 from color_to_gray_operations import luminosity_method as lm
 
 
-def get_value_dist_direction(arr, location, directions, k):
-    values = {}
-    #print(directions.shape)
-    for d in directions:
-        d = (d / k).astype(int)
-        d = tuple(d)
-        values[d] = arr[(location[0] + d[0], location[1] + d[1])]
-    #print((location[0] + d[0], location[1] + d[1]))
-    return values
+def find_empty_rows_cols_indices(arr):
+    """
+    returns a dict with keys 'rows' and 'cols', with values corresponding to indices of empty rows and empty columns
+    """
+    rows = []
+    cols = []
+    for i in range(arr.shape[0]):
+        row = arr[i, :]
+        if np.all(row == 0):
+            rows.append(i)
+    for j in range(arr.shape[1]):
+        col = arr[:, j]
+        if np.all(col == 0):
+            cols.append(j)
+    return {'rows': rows, 'cols': cols
+    }
 
-
-def weighted_median_linear_interpolation(img, edge_tube, input_weights=np.ones(8), pad_width=500):
-    #pad_width = max(edge_tube.shape)
-    max_iters = 400
-    if len(input_weights.shape) != 1:
-        input_weights = np.ravel(input_weights)
-    if input_weights.size == 9:
-        input_weights = np.delete(input_weights, 4)
+def weighted_median_linear_interpolation(img, edge_tube):
+    print(edge_tube[262, 268])
     interpolated = np.zeros(edge_tube.shape)
-    edge_tube = pad(edge_tube, pad_width=pad_width)
     cv2.imwrite('../output_data/test_output/edge_tube.png', edge_tube)
-    #edge_tube = view_as_windows(edge_tube, 3)
+
+    empty_rows_cols = find_empty_rows_cols_indices(edge_tube)
+    empty_rows = empty_rows_cols['rows']
+    empty_cols = empty_rows_cols['cols']
+    
+    # -- create lists to keep track of the uppermost and lowermost nonzero edge_tube pixel at each column
+    # -- (indexed by `j` in inner for-loop), and nearest vertical-direction edge tube pixels at each column
+    cols_uppermost = []
+    cols_lowermost = []
+    cols_upper = []
+    cols_lower = []
+    nearest_upper_vals = []
+    nearest_lower_vals = []
+
+    # -- get uppermost and lowermost values in each column
+
+    for col in range(interpolated.shape[1]):
+        if col in empty_cols:
+            cols_uppermost.append(-1)
+            continue
+        for row in range(interpolated.shape[0]):
+            val = edge_tube[row][col]
+            if val != 0:
+                cols_uppermost.append(row)
+                nearest_lower_vals.append(val)
+                break
+
+    cols_upper = cols_uppermost
+    cols_lower = cols_upper
+    nearest_lower_vals = cols_upper
+    nearest_upper_vals = nearest_lower_vals
+
+    for col in range(interpolated.shape[1]):
+        if col in empty_cols:
+            cols_lowermost.append(-1)
+        for row in range(1, interpolated.shape[0]):
+            val = edge_tube[-(row)][col]
+            if val != 0:
+                cols_lowermost.append(interpolated.shape[0] - row + 1)
+                break
+
+    # -- now run the whole interpolation
+
     for i in tqdm(range(interpolated.shape[0])):
+        if i not in empty_rows:
+            # -- find leftmost and rightmost nonzero values in edge_tube to use in dynamic programming
+            for left_min in range(interpolated.shape[1]):
+                pixel_val = edge_tube[i][left_min]
+                if pixel_val != 0:
+                    leftmost_idx = left_min
+                    leftmost_value = pixel_val
+                    break
+            for right_min in range(1, interpolated.shape[1]):
+                pixel_val = edge_tube[i][-(right_min)]
+                if pixel_val != 0:
+                    rightmost_idx = interpolated.shape[1] - right_min + 1
+                    rightmost_value = pixel_val
+                    break
+            
+            # -- at start of new row, initialize nearest horizontal indices to 
+            current_left_val = leftmost_value
+            current_right_val = current_left_val
+            left_dist, right_dist = leftmost_idx, leftmost_idx
+        else:
+            # -- handle cases in which edge tube row has no nonzero values
+            leftmost_idx = -1
+            leftmost_value = -1
+            rightmost_idx = -1
+            rightmost_value = -1
+            left_dist, right_dist = leftmost_idx, rightmost_idx
+            # -- the trick here is that later when we go to add distances and pixel values to target arrays, 
+            # -- we check if left_dist is -1. if yes, then don't use it to calculate new pixel value.
+
         for j in range(interpolated.shape[1]):
-            edge_pixels_found = False
-            k = 0
-            idx1 = pad_width + i
-            idx2 = pad_width + j
-            #distances = np.zeros(8)
-            #values = np.zeros(8)
-            #dists = [(x, y) for x in [-1, 0, 1] for y in [-1, 0, 1]]
-            dists = np.array([(1,1), (1,0), (1,-1), (0,1), (0,-1), (-1,1), (-1,0), (-1,-1)])
-            #dists_dict = {x: None for x in dists}
-            #values_dict = {x: None for x in dists}
-            dists_dict = {}
-            values_dict = {}
+            # -- handle cases in which edge tube column has no nonzero values
+            left_dist += 1
+            right_dist -= 1
+            if j in empty_cols:
+                if i in empty_rows:
+                    interpolated[i, j] = np.random.randint(0,255)
+                    continue
+                else:
+                    interpolated[i, j] = ((current_left_val / (left_dist + 1)) + (current_right_val / (right_dist + 1))) * (left_dist + right_dist + 2)
+                    continue
+            upper_dist = np.abs(i - cols_upper[j])
+            lower_dist = np.abs(cols_lower[j] - i)
             
-            #print(dists)
-            if edge_tube[idx1, idx2] != 0:
-                interpolated[i, j] = edge_tube[idx1, idx2]
-                #print('in edge tube')
-                continue # -- skip the search process
-            
-            while not edge_pixels_found:
-                k += 1
-                #print(k)
-                if k == max_iters:
-                    #print('not found' + str(k))
-                    #print(i, j)
-                    break
-                
-                if i - k == 0 or j - k == 0:
-                    break
+            current_val = edge_tube[i][j]
 
-                new_pixels = get_value_dist_direction(edge_tube, (idx1, idx2), k * dists, k)
-                #print(new_pixels)
-                
-                #b = 0
-                for a, p in new_pixels.items():
-                    #print(p)
-                    if p != 0:
-                        if not a in dists_dict.keys():
-                            dists_dict[a] = k
-                            values_dict[a] = p
-                            #dists = np.delete(dists, a - b, 0)
-                            #b += 1
+            if current_val == 0:
+                if j <= leftmost_idx:
+                    current_right_val = leftmost_value
+                    current_left_val = current_right_val
+
+                    if i < cols_uppermost[j]:
+                        current_lower_value = nearest_lower_vals[j]
+                        current_upper_value = current_lower_value
+                    elif i > cols_lowermost[j]:
+                        current_upper_value = nearest_upper_vals[j]
+                        current_lower_value = current_upper_value
+                    else:
+                        current_upper_value = nearest_upper_vals[j]
+                        current_lower_value = nearest_lower_vals[j]
+                elif j >= rightmost_idx:
+                    current_left_val = rightmost_value
+                    current_right_val = current_left_val
+
+                    if i < cols_uppermost[j]:
+                        current_lower_value = nearest_lower_vals[j]
+                        current_upper_value = current_lower_value
+                    elif i > cols_lowermost[j]:
+                        current_upper_value = nearest_upper_vals[j]
+                        current_lower_value = current_upper_value
+                    else:
+                        current_upper_value = nearest_upper_vals[j]
+                        current_lower_value = nearest_lower_vals[j]
+
+                else:
+                    if i < cols_uppermost[j]:
+                        current_lower_value = nearest_lower_vals[j]
+                        current_upper_value = current_lower_value
+                    elif i > cols_lowermost[j]:
+                        current_upper_value = nearest_upper_vals[j]
+                        current_lower_value = current_upper_value
+                    else:
+                        current_upper_value = nearest_upper_vals[j]
+                        current_lower_value = nearest_lower_vals[j]
+
+            elif current_val != 0:
+                current_left_val = current_val
+                current_upper_value = current_val
+                left_dist = 1
+                upper_dist = 1
+                # set new upper column index to the current row `i`
+                cols_upper[j] = i
+                # set new upper column pixel value to the current pixel value
+                nearest_upper_vals[j] = current_val
+
+                # -- if current pixel location is at rightmost index or lowermost index, don't search for new locations
+                if j < rightmost_idx - 1:
+                    # -- if current pixel is in edge tube, need to search for nearest edge tube pixel to the right
+                    nearest_right_found = False
+                    r = 1
+                    while j + r <= rightmost_idx:
+                        if edge_tube[i][j + r] != 0:
+                            current_right_val = edge_tube[i][j + r]
+                            nearest_right_found = True
+                            right_dist = r
+                            break
+                        else:
+                            r += 1
+                if i < cols_lowermost[j] - 1:
+                    # -- if current pixel is in edge tube, need to search for nearest edge tube pixel below
+                    nearest_lower_found = False
+                    l = 1
+
+                    while not nearest_lower_found:
+                        v = edge_tube[i + l, j]
+                        if v == 0:
+                            l += 1
+                        else:
+                            lower_idx = i + l
+                            cols_lower[j] = lower_idx
+                            current_lower_value = edge_tube[i + l][j]
+                            nearest_lower_vals[j] = current_lower_value
+                            lower_dist = l
                             
-                if len(dists_dict) == 8:
-                    edge_pixels_found = True
+                            nearest_lower_found = True
 
-            if not dists_dict:
-                interpolated[i][j] = img[i][j]
-                continue
-            distances = np.array(list(dists_dict.values()))
-            values = np.array(list(values_dict.values()))
+            values = [current_upper_value, current_lower_value]
+            distances = [upper_dist, lower_dist]
+            if leftmost_idx != -1:
+                values += [current_left_val, current_right_val]
+                distances += [left_dist, right_dist]
+            
             max_dist = np.max(distances)
-            min_dist = np.min(distances)
             weights = (max_dist - distances) + 1
             median_array = []
             for c, w in enumerate(weights):
                 median_array += [values[c]] * int(w)
             
-            #print(int(np.median(np.array(median_array))))
             interpolated[i][j] = int(np.median(np.array(median_array)))
-    #print(interpolated)
+            
     return interpolated
 
 
@@ -126,7 +245,7 @@ def edge_detection_qual_non_ref(img, edge_map=None, edge_detector=None, similari
         
         edge_map = edge_detector(img)
         if edge_detector != canny:
-            edge_map = np.where(edge_map > 15, 1, 0)
+            edge_map = np.where(edge_map > 5, 1, 0)
 
     if not isinstance(similarity_measure, str):
         raise AssertionError('similarity_measure must be a string denoting the similarity measure of your choice.')
@@ -154,7 +273,7 @@ def edge_detection_qual_non_ref(img, edge_map=None, edge_detector=None, similari
     cv2.imwrite('../output_data/edge_detection/quality_measures/edge_tubes/' + edge_detector_str + '.png', edge_tube)
 
     # -- perform weighted median linear interpolation to reconstruct image
-    reconstructed_img = weighted_median_linear_interpolation(img, edge_tube=edge_tube, input_weights=weights)
+    reconstructed_img = weighted_median_linear_interpolation(img, edge_tube=edge_tube)
     cv2.imwrite('../output_data/edge_detection/quality_measures/reconstructed/' + edge_detector_str + '.png', reconstructed_img)
 
     # -- compare original image with image reconstructed from edge map
@@ -165,7 +284,7 @@ def edge_detection_qual_non_ref(img, edge_map=None, edge_detector=None, similari
 
 def compare_edge_detector_qualities(img, edge_detectors=None, measure='SSIM', weights=None):
     if edge_detectors is None:
-        edge_detectors = ['canny', 'sobel', 'sobel_h', 'sobel_v', 'prewitt', 'prewitt_h', 'prewitt_v']
+        edge_detectors = ['canny', 'sobel', 'prewitt']
     if isinstance(edge_detectors, str):
         edge_detectors = [edge_detectors]
 
@@ -178,7 +297,7 @@ def compare_edge_detector_qualities(img, edge_detectors=None, measure='SSIM', we
 
 
 def main():
-    img = lm(cv2.imread('../input_data/grayscale_tunnels/grayscale_tunnel_1.png'))
+    img = lm(cv2.imread('../input_data/visolo_tunnel_gray.jpg'))
     qualities = compare_edge_detector_qualities(img)
     print(qualities)
 
