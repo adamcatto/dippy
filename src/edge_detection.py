@@ -27,8 +27,7 @@ def find_empty_rows_cols_indices(arr):
         col = arr[:, j]
         if np.all(col == 0):
             cols.append(j)
-    return {'rows': rows, 'cols': cols
-    }
+    return {'rows': rows, 'cols': cols}
 
 def weighted_median_linear_interpolation(img, edge_tube):
     print(edge_tube[262, 268])
@@ -245,7 +244,7 @@ def edge_detection_qual_non_ref(img, edge_map=None, edge_detector=None, similari
         
         edge_map = edge_detector(img)
         if edge_detector != canny:
-            edge_map = np.where(edge_map > 5, 1, 0)
+            edge_map = np.where(edge_map > 15, 1, 0)
 
     if not isinstance(similarity_measure, str):
         raise AssertionError('similarity_measure must be a string denoting the similarity measure of your choice.')
@@ -296,10 +295,56 @@ def compare_edge_detector_qualities(img, edge_detectors=None, measure='SSIM', we
     return scores
 
 
-def main():
-    img = lm(cv2.imread('../input_data/visolo_tunnel_gray.jpg'))
+def run_edge_detector_quality_measure():
+    img = lm(cv2.imread('../input_data/grayscale_tunnels/grayscale_tunnel_1.png'))
     qualities = compare_edge_detector_qualities(img)
     print(qualities)
 
 
-main()
+def apply_frost_filter(window, tuning_factor=0.1):
+    window_flat = np.ravel(window)
+    sum_all_pixels = np.sum(window_flat)
+    filter_val = 0
+    mean = np.mean(window_flat)
+    stdev = np.var(window_flat)
+    var_coef = stdev / mean
+    ms = []
+
+    for i, val in enumerate(window_flat):
+        position = (i // window.shape[0] / 2 , i % window.shape[0] // 2)
+        dist = np.max(np.array(window.shape) // 2 - np.array(position))
+        m = np.exp(var_coef ** 2 * (-tuning_factor) * dist)
+        ms.append(m)
+    
+    ms = np.array(ms)
+    return np.dot(window_flat, ms) / np.sum(ms)
+
+
+def shearlet_transform(img, window_shape=17, shear=2, scale=1, translation=2):
+    """
+    # -- step 1:    frost filter preprocessing
+                    this preserves details around edges
+    # -- step 2: log transform
+    # -- step 3: apply shearlet --> get road
+    # -- step 4: apply exponential transform
+    # -- step 5: binarize using threshold
+    # -- step 6: apply morphological operation
+    # -- step 7: return
+    """
+    if len(img.shape) == 3:
+        img = lm(img)
+    # -- step 1: frost filter preprocessing
+    # -- initialize windows
+    windowed_img = view_as_windows(arr_in=img, window_shape=window_shape)
+    transformed_array = np.zeros(img.shape[0] * img.shape[1])
+    for i, w in tqdm(enumerate(windowed_img)):
+        transformed_array[i] = apply_frost_filter(window=w)
+
+    transformed_array = np.log(transformed_array)
+    transformed_img = transformed_array.reshape(img.shape)
+    anisotropic_expansion_matrix = np.array([[1, k], [0, 1]])
+    shear_matrix = np.array([[1, 1], [0, 1]])
+    affine_system = np.linalg.norm(np.linalg.det(transformed_array)) ** (scale / 2)
+    # todo: finish this function
+
+
