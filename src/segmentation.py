@@ -182,6 +182,32 @@ def test_abstract_painting():
         start_num += 1
 
 
+def prepare_frame_segment(seed_img, filename=None, img=None, blur=None, as_numeric=True, stretched=True):
+    if filename:
+        img = lm(cv2.imread(filename))
+    elif img is not None:
+        if len(img.shape) == 3:
+            img = lm(img)
+    else:
+        raise Exception('Must specify either a path to the image file or a numpy-array image; got neither')
+    
+    if blur:
+        if isinstance(blur, int):
+            blur = (blur, blur)
+        img = cv2.blur(img, blur)
+        #seed_img = cv2.blur(seed_img, blur)
+
+    img = slice_bit_planes(img, 4)
+    seed_img = slice_bit_planes(seed_img, 4)
+    diff_img = np.abs(img - seed_img)
+    segmented = diff_img > threshold
+    if as_numeric:
+        segmented = segmented.astype(int)
+        if stretched:
+            segmented = stretch_histogram(segmented)
+    return segmented
+
+
 def motion_segmentation(seed_img_file, in_dir, out_dir, threshold, num_frames, blur=None):
     # process the seed image
     if seed_img_file is not None:
@@ -456,8 +482,8 @@ def rename_images_padded(in_dir):
         cv2.imwrite(os.path.join(in_dir, n + '.png'), img)
         os.remove(f)
 
-main()
-make_montages()
+#main()
+#make_montages()
 """
 img = lm(cv2.imread('../input_data/gray_tunnel_sequence/images/0023.png'))
 img = stretch_histogram(np.log(img + 1))

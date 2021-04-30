@@ -1,16 +1,22 @@
+from typing import Tuple
 import os
 from operator import xor
 
 import cv2
 import numpy as np
-from skimage.morphology import dilation
+from skimage.morphology import dilation, binary_dilation, binary_erosion, binary_closing, erosion, opening, closing
 from skimage.metrics import structural_similarity, mean_squared_error, peak_signal_noise_ratio
 from skimage.util import pad, view_as_windows, crop
 from skimage.feature import canny
-from skimage.filters import sobel, sobel_h, sobel_v, prewitt, prewitt_h, prewitt_v
+from skimage.filters import sobel, sobel_h, sobel_v, prewitt, prewitt_h, prewitt_v, difference_of_gaussians
 from tqdm import tqdm
+from findpeaks import frost_filter
+from findpeaks.filters.kuan import kuan_filter
+from scipy.fft import dctn, dstn, dct, dst, idctn, idstn
+from pywt import dwt2
 
 from color_to_gray_operations import luminosity_method as lm
+from segmentation import prepare_frame_segment
 
 
 def find_empty_rows_cols_indices(arr):
@@ -241,10 +247,15 @@ def edge_detection_qual_non_ref(img, edge_map=None, edge_detector=None, similari
                 edge_detector = sobel_h
             elif edge_detector == 'sobel_v':
                 edge_detector = sobel_v
+            elif edge_detector == 'lapgauss':
+                edge_detector = difference_of_gaussians
         
-        edge_map = edge_detector(img)
+        if edge_detector != difference_of_gaussians:
+            edge_map = edge_detector(img)
+        else:
+            edge_map = edge_detector(img, 2)
         if edge_detector != canny:
-            edge_map = np.where(edge_map > 15, 1, 0)
+            edge_map = np.where(edge_map > 1, 1, 0)
 
     if not isinstance(similarity_measure, str):
         raise AssertionError('similarity_measure must be a string denoting the similarity measure of your choice.')
@@ -262,7 +273,9 @@ def edge_detection_qual_non_ref(img, edge_map=None, edge_detector=None, similari
         weights = np.ones(8)
 
     # -- cast any possible bool arrays to False ~ 0 ; True ~ 255
-    edge_map = edge_map.astype(int) * 255
+    edge_map = edge_map.astype(int)
+    num_edge_pixels_predicted = np.sum(np.ravel(edge_map))
+    edge_map *= 255
     cv2.imwrite('../output_data/edge_detection/quality_measures/edge_maps/' + edge_detector_str + '.png', edge_map)
 
     dilated_edge_map = dilation(edge_map)
@@ -277,13 +290,14 @@ def edge_detection_qual_non_ref(img, edge_map=None, edge_detector=None, similari
 
     # -- compare original image with image reconstructed from edge map
     similarity_score = measure_similarity(img, reconstructed_img)
+    similarity_score /= np.log(num_edge_pixels_predicted + np.e)
 
     return similarity_score
 
 
 def compare_edge_detector_qualities(img, edge_detectors=None, measure='SSIM', weights=None):
     if edge_detectors is None:
-        edge_detectors = ['canny', 'sobel', 'prewitt']
+        edge_detectors = ['canny', 'sobel', 'sobel_h', 'sobel_v', 'prewitt', 'prewitt_h', 'prewitt_v', 'lapgauss']
     if isinstance(edge_detectors, str):
         edge_detectors = [edge_detectors]
 
@@ -296,12 +310,67 @@ def compare_edge_detector_qualities(img, edge_detectors=None, measure='SSIM', we
 
 
 def run_edge_detector_quality_measure():
-    img = lm(cv2.imread('../input_data/grayscale_tunnels/grayscale_tunnel_1.png'))
+    img = lm(cv2.imread('../input_data/visolo_tunnel_gray.jpg'))
     qualities = compare_edge_detector_qualities(img)
     print(qualities)
 
+    
+def motion_edge_based_segmentation(filenames, out_dir, num_frames=150, num_prev_frames=10, blur=(7,7), as_numeric=True, stretched=True):
+    """
+    seed img ~ cumulative moving average
+    """
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+
+    if num_frames is None or num_frames > len(filenames):
+        num_frames = len(filenames)
+
+    edge_detector = canny
+
+    initial_background_model = []
+    for f in filenames[0:num_prev_frames]:
+        seed_frame = lm(cv2.imread(f))
+        if blur:
+            seed_frame = cv2.blur(seed_frame, blur)
+        seed_frame_edges = edge_detector(seed_frame).astype(int)
+        #seed_frame_edges = seed_frame_edges
+        initial_background_model.append(seed_frame_edges)
+
+    initial_background_model = np.array(initial_background_model)
+    initial_background_model = np.sum(initial_background_model, axis=0) / 10
+    #seed_img = np.average(initial_background_model, axis=0)
+    seed_img = initial_background_model
+    seed_img_binary = np.where(initial_background_model >= 0.5, 1, 0)
+    #print(seed_img_binary)
+    
+    
+    #initial_background_model = np.array([lm(cv2.imread(f)) for f in filenames[0:num_prev_frames]])
+
+    #if blur:
+     #   seed_img = cv2.blur(seed_img, blur)
+    counter = 10
+
+    for i, f in tqdm(enumerate(filenames[num_prev_frames:num_frames])):
+        img = lm(cv2.imread(f))
+        if blur:
+            img = cv2.blur(img, blur)
+        img_edge_map = edge_detector(img).astype(int)
+        seed_img = (counter * seed_img + img_edge_map) / (counter + 1)
+        seed_img_binary = np.where(seed_img >= 0.5, 1, 0)
+        #segmented = prepare_frame_segment(seed_img=seed_img_binary, img=img, blur=None)
+        segmented = img_edge_map - seed_img_binary
+        #segmented = binary_erosion(segmented, selem=np.ones((3,3)))
+        counter += 1
+        cv2.imwrite(os.path.join(out_dir, 'backgrounds', filenames[i + num_prev_frames][-8:]), seed_img_binary * 255)
+        cv2.imwrite(os.path.join(out_dir, 'edge_maps', filenames[i + num_prev_frames][-8:]), img_edge_map * 255)
+        cv2.imwrite(os.path.join(out_dir, 'segmented', filenames[i + num_prev_frames][-8:]), segmented * 255)
+
+
 
 def apply_frost_filter(window, tuning_factor=0.1):
+    """
+    IMO this looks better than default findpeaks frost filter, but takes way longer.
+    """
     window_flat = np.ravel(window)
     sum_all_pixels = np.sum(window_flat)
     filter_val = 0
@@ -320,7 +389,14 @@ def apply_frost_filter(window, tuning_factor=0.1):
     return np.dot(window_flat, ms) / np.sum(ms)
 
 
-def shearlet_transform(img, window_shape=17, shear=2, scale=1, translation=2):
+def compute_shearlet_at_point(point: Tuple[int,int], shear=2, scale=2, translation=(2,2)):
+    shear_matrix = np.array([[1, shear], [0, 1]])
+    anisotropic_expansion_matrix = np.array([[2**scale, 0], [0, 2**(scale/2)]])
+    #even_shearlet = 2 ** (3 * scale / 2) * dwt2(shear_matrix * anisotropic_expansion_matrix * (np.array(point) - np.array(translation)), wavelet='haar')
+    #odd_shearlet = 2 ** (3 * scale / 2) * _odd_ * shear_matrix * anisotropic_expansion_matrix * (np.array(point) - np.array(translation))
+
+
+def shearlet_transform(img, window_shape=17, shear=1, scale=2, translation=(2,2)):
     """
     # -- step 1:    frost filter preprocessing
                     this preserves details around edges
@@ -331,20 +407,125 @@ def shearlet_transform(img, window_shape=17, shear=2, scale=1, translation=2):
     # -- step 6: apply morphological operation
     # -- step 7: return
     """
+    #path = '/Users/adamcatto/SRC/dippy/output_data/edge_detection/shearlets/shearlets'
     if len(img.shape) == 3:
         img = lm(img)
     # -- step 1: frost filter preprocessing
     # -- initialize windows
     windowed_img = view_as_windows(arr_in=img, window_shape=window_shape)
-    transformed_array = np.zeros(img.shape[0] * img.shape[1])
-    for i, w in tqdm(enumerate(windowed_img)):
-        transformed_array[i] = apply_frost_filter(window=w)
+    #transformed_array = np.zeros(img.shape[0] * img.shape[1])
+    #for i, w in tqdm(enumerate(windowed_img)):
+    #    transformed_array[i] = apply_frost_filter(window=w)
 
-    transformed_array = np.log(transformed_array)
-    transformed_img = transformed_array.reshape(img.shape)
-    anisotropic_expansion_matrix = np.array([[1, k], [0, 1]])
-    shear_matrix = np.array([[1, 1], [0, 1]])
-    affine_system = np.linalg.norm(np.linalg.det(transformed_array)) ** (scale / 2)
+    #transformed_array = np.log(transformed_array)
+    #transformed_img = transformed_array.reshape(img.shape)
+    shear_matrix = np.array([[1, shear], [0, 1]])
+    anisotropic_expansion_matrix = np.array([[2**scale, 0], [0, 2**(scale/2)]])
+    dct_img = dctn(img)
+    dst_img = dstn(img)
+    #dct_img = dct(dct(img.T, norm='ortho').T, norm='ortho')
+    #dst_img = dst(dst(img.T, norm='ortho').T, norm='ortho')
+    
+    #wav_img = np.dstack(dct_img, dst_img)
+    
+    dct_img *= 2**scale
+    dst_img *= 2** (scale/2)
+
+    new_dct_img = dct_img + shear * dst_img
+    new_dct_img *= (2 ** (3*scale / 2))
+    new_dst_img = dst_img
+    new_dst_img *= (2 ** (3*scale / 2))
+
+
+    path = '/Users/adamcatto/SRC/dippy/output_data/edge_detection/shearlets/shearlets'
+    cv2.imwrite(os.path.join(path, 'even.png'), idctn(new_dct_img))
+    cv2.imwrite(os.path.join(path, 'odd.png'), idctn(new_dst_img))
+
+    #shearlet = compute_shearlet_at_point((i, j), shear, scale, translation)
+    
+    
+    #affine_system = np.linalg.norm(np.linalg.det(transformed_array)) ** (scale / 2)
+
     # todo: finish this function
 
 
+def motion_edge_based_segmentation_prev_frame(filenames, out_dir, num_frames=150, window_shape=9):
+    """
+    seed img ~ cumulative moving average
+    """
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+
+    if num_frames is None or num_frames > len(filenames):
+        num_frames = len(filenames)
+
+    edge_detector = sobel
+    prev_frame = lm(cv2.imread(filenames[0]))
+    prev_frame = kuan_filter(prev_frame, window_shape)
+    #prev_frame = transformed_array.reshape(prev_frame.shape)
+    prev_frame_edges = edge_detector(prev_frame).astype(bool).astype(int)
+    prev_frame_edges_dilated = binary_dilation(prev_frame_edges).astype(int)
+
+    for i, f in tqdm(enumerate(filenames[1:num_frames])):
+        curr_frame = lm(cv2.imread(f))
+        curr_frame = kuan_filter(curr_frame, window_shape)
+        cv2.imwrite(os.path.join(out_dir, 'frost_filter', filenames[i + 1][-8:]), curr_frame)
+        curr_frame_edges = edge_detector(curr_frame).astype(bool).astype(int)
+        curr_frame_edges_dilated = binary_dilation(curr_frame_edges).astype(int)
+        
+        diff_dilated = curr_frame_edges_dilated - prev_frame_edges_dilated
+        cv2.imwrite(os.path.join(out_dir, 'segmented', filenames[i + 1][-8:]), diff_dilated*255)
+        prev_frame_edges_dilated = curr_frame_edges_dilated
+
+
+
+img = lm(cv2.imread('../output_data/deblur/local/gray_tunnel_1.png'))
+bin_img = np.where(img > 180, 255, 0)
+
+selem = np.array([
+    [0, 0, 0, 1, 1],
+    [0, 0, 1, 1, 0],
+    [0, 1, 1, 1, 0],
+    [0, 1, 1, 0, 0],
+    [1, 1, 0, 0, 0]
+])
+#bin_img = erosion(bin_img, selem)
+
+selem = np.array([
+    [0, 0, 0, 0, 1],
+    [0, 0, 0, 0, 1],
+    [0, 0, 1, 1, 0],
+    [1, 1, 0, 0, 0],
+    [0, 0, 0, 0, 0]
+])
+
+#bin_img = closing(bin_img, selem)
+#bin_img = dilation(bin_img, np.array([[1,1,1]]))
+
+"""
+bin_img = erosion(image=bin_img, selem=np.ones((2,2)))
+#bin_img = opening(bin_img, selem=np.ones((3,3)))
+#bin_img = erosion(bin_img, selem=np.ones((3,3)))
+#bin_img = erosion(bin_img, selem=np.ones((2,2)))
+#bin_img = dilation(bin_img, selem=np.ones((6,6)))
+bin_img = erosion(image=bin_img, selem=np.ones((2,2)))
+bin_img = closing(image=bin_img, selem=np.ones((2,2)))
+bin_img = closing(image=bin_img, selem=np.ones((3,3)))
+bin_img = closing(image=bin_img, selem=np.ones((5,5)))
+bin_img = closing(image=bin_img, selem=np.ones((7,7)))
+bin_img = closing(image=bin_img, selem=np.ones((11,11)))
+#bin_img = closing(image=bin_img, selem=np.ones((17,17)))
+bin_img = erosion(bin_img, selem=np.ones((3,3)))
+"""
+#bin_img = opening(image=bin_img, selem=np.ones((3,3)))
+print(bin_img)
+cv2.imwrite('../output_data/test_output/tunnel_deblur_edges.png', bin_img)
+#img = lm(cv2.imread('../input_data/grayscale_tunnels/grayscale_tunnel_1.png'))
+#shearlet_transform(img)
+#run_edge_detector_quality_measure()
+
+"""gray_tunnel_seq_names = list(sorted(os.listdir('../input_data/cleaned_gray_tunnel_sequence/')))
+gray_tunnel_seq = list(sorted([os.path.join('../input_data/gray_tunnel_sequence/images/', t) for t in gray_tunnel_seq_names]))
+edge_seg_dir = '../output_data/segmentation/edge_based'
+motion_edge_based_segmentation_prev_frame(filenames=gray_tunnel_seq, out_dir=edge_seg_dir)
+"""

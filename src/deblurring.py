@@ -151,9 +151,9 @@ bm = cv2.imread('../output_data/deblur/local/gray_tunnel_1.png')
 s = segment_blur_map(bm)
 print(s)
 """
-overlay = test_overlay_original_on_smoothed()
+#overlay = test_overlay_original_on_smoothed()
 #cv2.imwrite('../output_data/smooth_segment_blend/overlay_smooth_rolling.png', overlay)
-cv2.imwrite('../output_data/smooth_segment_blend/overlay_frequency_domain_highpass.png', overlay)
+#cv2.imwrite('../output_data/smooth_segment_blend/overlay_frequency_domain_highpass.png', overlay)
 
 #test_blend_smooth_with_segment()
 
