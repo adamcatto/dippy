@@ -489,7 +489,7 @@ selem = np.array([
     [0, 1, 1, 0, 0],
     [1, 1, 0, 0, 0]
 ])
-#bin_img = erosion(bin_img, selem)
+bin_img = erosion(bin_img, selem)
 
 selem = np.array([
     [0, 0, 0, 0, 1],
@@ -499,8 +499,8 @@ selem = np.array([
     [0, 0, 0, 0, 0]
 ])
 
-#bin_img = closing(bin_img, selem)
-#bin_img = dilation(bin_img, np.array([[1,1,1]]))
+bin_img = closing(bin_img, selem)
+bin_img = dilation(bin_img, np.array([[1,1,1]]))
 
 """
 bin_img = erosion(image=bin_img, selem=np.ones((2,2)))

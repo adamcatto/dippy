@@ -12,7 +12,8 @@ from color_to_gray_operations import luminosity_method, average_method
 from image_metrics import compute_eme_score
 
 
-def compute_image_histogram(img: np.array) -> Union[Tuple[np.array, np.array], Tuple[Tuple[np.array, np.array], Tuple[np.array, np.array], Tuple[np.array, np.array]]]:
+def compute_image_histogram(img: np.ndarray) -> Union[Tuple[np.ndarray, np.ndarray], 
+    Tuple[Tuple[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray], Tuple[np.ndarray, np.ndarray]]]:
     if len(img.shape) == 2:
         hist, bins = np.histogram(img, bins=[x for x in range(0, 257)])
         return hist, bins

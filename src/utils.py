@@ -51,4 +51,8 @@ def remove_duplicates(in_dir, test_dir):
         os.rename(f, os.path.join(test_dir, i + '.png'))
     """
 
+
+def sliding_window(img, window):
+    pass
+
 #remove_duplicates(in_dir='/Users/adamcatto/SRC/dippy/input_data/gray_tunnel_sequence/images', test_dir='/Users/adamcatto/SRC/dippy/input_data/cleaned_gray_tunnel_sequence')
