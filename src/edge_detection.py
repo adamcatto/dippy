@@ -4,19 +4,21 @@ from operator import xor
 
 import cv2
 import numpy as np
-from skimage.morphology import dilation, binary_dilation, binary_erosion, binary_closing, erosion, opening, closing
+from skimage.morphology import dilation, erosion, opening, closing, disk
 from skimage.metrics import structural_similarity, mean_squared_error, peak_signal_noise_ratio
-from skimage.util import pad, view_as_windows, crop
+from skimage.util import pad, view_as_windows, crop, montage
 from skimage.feature import canny
 from skimage.filters import sobel, sobel_h, sobel_v, prewitt, prewitt_h, prewitt_v, difference_of_gaussians
+from skimage.filters.rank import minimum
+from skimage.measure import label
 from tqdm import tqdm
-from findpeaks import frost_filter
-from findpeaks.filters.kuan import kuan_filter
-from scipy.fft import dctn, dstn, dct, dst, idctn, idstn
-from pywt import dwt2
+#from findpeaks import frost_filter
+#from findpeaks.filters.kuan import kuan_filter
+#from scipy.fft import dctn, dstn, dct, dst, idctn, idstn
+#from pywt import dwt2
 
 from color_to_gray_operations import luminosity_method as lm
-from segmentation import prepare_frame_segment
+from segmentation import prepare_frame_segment, system_3
 
 
 def find_empty_rows_cols_indices(arr):
@@ -477,8 +479,100 @@ def motion_edge_based_segmentation_prev_frame(filenames, out_dir, num_frames=150
         cv2.imwrite(os.path.join(out_dir, 'segmented', filenames[i + 1][-8:]), diff_dilated*255)
         prev_frame_edges_dilated = curr_frame_edges_dilated
 
+def motion_segment_morphology(frame0, frame1):
+    #img0 = lm(cv2.imread('../input_data/cleaned_gray_tunnel_sequence/0025.png'))
+    #img1 = lm(cv2.imread('../input_data/cleaned_gray_tunnel_sequence/0026.png'))
+    #canny_edges0 = canny(img0).astype(int) * 255
+    #canny_edges1 = canny(img1).astype(int) * 255
+    sobel_edges0 = sobel(frame0)
+    sobel_edges1 = sobel(frame1)
+    sobel_edges0 = np.where(sobel_edges0 > 10, 1, 0)
+    sobel_edges1 = np.where(sobel_edges1 > 10, 1, 0)
+    sobel_diff = sobel_edges1 - sobel_edges0
+
+    sobel_diff = erosion(sobel_diff, np.ones((3,3)))
+    #sobel_diff = erosion(sobel_diff, selem=np.ones((3,3)))
+    sobel_diff = erosion(sobel_diff, selem=np.ones((5,5)))
+    sobel_diff = dilation(sobel_diff, selem=np.ones((11,11)))
+    sobel_diff = dilation(sobel_diff, selem=np.ones((11,11)))
+    sobel_diff = dilation(sobel_diff, selem=np.ones((3,3)))
+    sobel_diff = dilation(sobel_diff, selem=np.ones((5,5)))
+    sobel_diff = dilation(sobel_diff, selem=np.ones((7,7)))
+    sobel_diff = dilation(sobel_diff, selem=np.ones((9,9)))
+    sobel_diff = closing(sobel_diff, selem=np.ones((11,11)))
+    sobel_diff = closing(sobel_diff, np.ones((15,15)))
+    r = sobel_diff.astype(int) * 255
+    return r
 
 
+def motion_segment_morphology_batch(img_dir, num_frames, num_prev_frames):
+    files = os.listdir(img_dir)
+    files = list(sorted(files))
+    filenames = list(sorted([os.path.join(img_dir, f) for f in files]))
+
+    diffs = []
+    seg_diffs = []
+    selem = np.ones((3, 3))
+    img0 = lm(cv2.imread(filenames[0]))
+    mask_zeros = np.zeros((int(img0.shape[0] / 3) + 12, img0.shape[1]))
+    mask_ones = np.ones((img0.shape[0] - 12 - int(img0.shape[0] / 3), img0.shape[1]))
+    mask = np.vstack((mask_zeros, mask_ones)).astype(int)
+    print(mask.shape)
+    #mask = np.dstack((mask, mask, mask))
+    #motion_seg_images = system_3(img_dir, threshold=10)
+    for i, f in tqdm(enumerate(filenames[num_prev_frames: num_frames])):
+        img1 = lm(cv2.imread(f))
+        img_stacked = np.dstack((img1, img1, img1))
+        diff = motion_segment_morphology(img0, img1)
+        diff *= mask
+        #blobs_diff = label(diff, background=0)
+
+        #motion_seg_img = motion_seg_images[i]
+        #joined = diff + motion_seg_img
+        #joined = np.dstack((joined, np.zeros(joined.shape), np.zeros(joined.shape)))
+        #app = np.where(joined > 0, 255, img_stacked)
+        #blobs_seg = label(motion_seg_img, background=0)
+        #blobs_seg = label(erosion(motion_seg_img, selem=np.ones((5,5))), background=0)
+
+        #intersection_blobs = np.where((blobs_seg != 0) & (diff != 0), blobs_seg, 0)
+        #labels_to_include = np.unique(intersection_blobs)[1:]
+        #joined_diff = np.where((blobs_seg in labels_to_include) | (diff > 0), 255, 0)
+        #stack_diff = np.dstack((diff, np.zeros(diff.shape), np.zeros(diff.shape)))
+        #diff = np.where(diff > 0, 255, img_stacked)
+        #diff = np.dstack((joined_diff, np.zeros(joined_diff.shape), np.zeros(joined_diff.shape)))
+        diff = np.dstack((diff, np.zeros(diff.shape), np.zeros(diff.shape)))
+        diff = np.where(diff > 0, 255, img_stacked)
+        
+        seg_diffs.append(diff)
+        img0 = img1
+    
+    for i, d in tqdm(enumerate(seg_diffs)):
+        cv2.imwrite('../output_data/edge_detection/tunnel_sequence/morphology_diffs/' + files[i + num_prev_frames], d)
+        cv2.imwrite('../output_data/edge_detection/tunnel_sequence/morphology_seg_combos/' + files[i + num_prev_frames], seg_diffs[i])
+
+
+
+def make_montages(original_path, processed_path, out_dir):
+    original_files = list(sorted(os.listdir(original_path)))
+    processed_files = list(sorted(os.listdir(processed_path)))
+
+    for i, f in tqdm(enumerate(processed_files)):
+        original_img = lm(cv2.imread(os.path.join(original_path, f)))
+        processed_img = lm(cv2.imread(os.path.join(processed_path, f)))
+        arr = np.array([original_img, processed_img])
+        mntg = montage(arr, grid_shape=(1, 2))
+        out_file = os.path.join(out_dir, f)
+        cv2.imwrite(out_file, mntg)
+
+
+motion_segment_morphology_batch(img_dir='../input_data/cleaned_gray_tunnel_sequence/', num_frames=150, num_prev_frames=10)
+make_montages('../input_data/cleaned_gray_tunnel_sequence/', 
+    '../output_data/edge_detection/tunnel_sequence/morphology_diffs/', 
+    '../output_data/edge_detection/tunnel_sequence/montages/')
+
+
+
+"""
 img = lm(cv2.imread('../output_data/deblur/local/gray_tunnel_1.png'))
 bin_img = np.where(img > 180, 255, 0)
 
@@ -499,32 +593,17 @@ selem = np.array([
     [0, 0, 0, 0, 0]
 ])
 
-bin_img = closing(bin_img, selem)
-bin_img = dilation(bin_img, np.array([[1,1,1]]))
 
-"""
-bin_img = erosion(image=bin_img, selem=np.ones((2,2)))
-#bin_img = opening(bin_img, selem=np.ones((3,3)))
-#bin_img = erosion(bin_img, selem=np.ones((3,3)))
-#bin_img = erosion(bin_img, selem=np.ones((2,2)))
-#bin_img = dilation(bin_img, selem=np.ones((6,6)))
-bin_img = erosion(image=bin_img, selem=np.ones((2,2)))
-bin_img = closing(image=bin_img, selem=np.ones((2,2)))
-bin_img = closing(image=bin_img, selem=np.ones((3,3)))
-bin_img = closing(image=bin_img, selem=np.ones((5,5)))
-bin_img = closing(image=bin_img, selem=np.ones((7,7)))
-bin_img = closing(image=bin_img, selem=np.ones((11,11)))
-#bin_img = closing(image=bin_img, selem=np.ones((17,17)))
-bin_img = erosion(bin_img, selem=np.ones((3,3)))
-"""
+#bin_img = closing(bin_img, selem)
+#bin_img = dilation(bin_img, np.array([[1,1,1]]))
 #bin_img = opening(image=bin_img, selem=np.ones((3,3)))
-print(bin_img)
-cv2.imwrite('../output_data/test_output/tunnel_deblur_edges.png', bin_img)
+#print(bin_img)
+#cv2.imwrite('../output_data/test_output/tunnel_deblur_edges.png', bin_img)
 #img = lm(cv2.imread('../input_data/grayscale_tunnels/grayscale_tunnel_1.png'))
 #shearlet_transform(img)
 #run_edge_detector_quality_measure()
 
-"""gray_tunnel_seq_names = list(sorted(os.listdir('../input_data/cleaned_gray_tunnel_sequence/')))
+gray_tunnel_seq_names = list(sorted(os.listdir('../input_data/cleaned_gray_tunnel_sequence/')))
 gray_tunnel_seq = list(sorted([os.path.join('../input_data/gray_tunnel_sequence/images/', t) for t in gray_tunnel_seq_names]))
 edge_seg_dir = '../output_data/segmentation/edge_based'
 motion_edge_based_segmentation_prev_frame(filenames=gray_tunnel_seq, out_dir=edge_seg_dir)

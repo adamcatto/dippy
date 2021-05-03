@@ -1,8 +1,8 @@
-from typing import Union
+from typing import Mapping, Tuple, Union
 
 import numpy as np
 import cv2
-from skimage.utils import view_as_windows
+from skimage.util import view_as_windows
 
 
 def luminance_similarity(img_1, img_2, regularization_term=0.01, dynamic_range=255):
