@@ -146,11 +146,13 @@ def test_overlay_original_on_smoothed():
     return smooth_img
 
 
-"""
-bm = cv2.imread('../output_data/deblur/local/gray_tunnel_1.png')
-s = segment_blur_map(bm)
+
+# bm = cv2.imread('../output_data/deblur/local/gray_tunnel_1.png')
+bm = cv2.imread('../input_data/cleaned_gray_tunnel_sequence/0101.png')
+s = compute_img_blurriness(bm)
 print(s)
-"""
+cv2.imwrite('../output_data/test_output/blur_edge_0101.png', s)
+
 #overlay = test_overlay_original_on_smoothed()
 #cv2.imwrite('../output_data/smooth_segment_blend/overlay_smooth_rolling.png', overlay)
 #cv2.imwrite('../output_data/smooth_segment_blend/overlay_frequency_domain_highpass.png', overlay)

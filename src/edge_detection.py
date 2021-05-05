@@ -6,11 +6,12 @@ import cv2
 import numpy as np
 from skimage.morphology import dilation, erosion, opening, closing, disk
 from skimage.metrics import structural_similarity, mean_squared_error, peak_signal_noise_ratio
-from skimage.util import pad, view_as_windows, crop, montage
+from skimage.util import pad, view_as_windows, crop, montage, view_as_blocks
 from skimage.feature import canny
 from skimage.filters import sobel, sobel_h, sobel_v, prewitt, prewitt_h, prewitt_v, difference_of_gaussians
 from skimage.filters.rank import minimum
 from skimage.measure import label
+from scipy.fftpack import dct
 from tqdm import tqdm
 #from findpeaks import frost_filter
 #from findpeaks.filters.kuan import kuan_filter
@@ -19,6 +20,8 @@ from tqdm import tqdm
 
 from color_to_gray_operations import luminosity_method as lm
 from segmentation import prepare_frame_segment, system_3
+from histogram_processing import stretch_histogram
+from decomposition import slice_bit_planes
 
 
 def find_empty_rows_cols_indices(arr):
@@ -454,6 +457,7 @@ def shearlet_transform(img, window_shape=17, shear=1, scale=2, translation=(2,2)
 def motion_edge_based_segmentation_prev_frame(filenames, out_dir, num_frames=150, window_shape=9):
     """
     seed img ~ cumulative moving average
+    this is too slow to be used in practice. avoid the heavy preprocessing filters.
     """
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
@@ -565,12 +569,56 @@ def make_montages(original_path, processed_path, out_dir):
         cv2.imwrite(out_file, mntg)
 
 
-motion_segment_morphology_batch(img_dir='../input_data/cleaned_gray_tunnel_sequence/', num_frames=150, num_prev_frames=10)
-make_montages('../input_data/cleaned_gray_tunnel_sequence/', 
-    '../output_data/edge_detection/tunnel_sequence/morphology_diffs/', 
-    '../output_data/edge_detection/tunnel_sequence/montages/')
+# motion_segment_morphology_batch(img_dir='../input_data/cleaned_gray_tunnel_sequence/', num_frames=150, num_prev_frames=10)
+# make_montages('../input_data/cleaned_gray_tunnel_sequence/', 
+    # '../output_data/edge_detection/tunnel_sequence/morphology_diffs/', 
+    # '../output_data/edge_detection/tunnel_sequence/montages/')
 
 
+def dct_motion_blur_detection(img, block_size):
+    if len(img.shape) == 3:
+        img = lm(img)
+
+    if isinstance(block_size, int):
+        block_size_tuple = (block_size, block_size)
+    else:
+        block_size_tuple = block_size
+
+    block_img = view_as_blocks(img, block_size_tuple)
+    print(block_img.shape)
+    for i in range(block_img.shape[0]):
+        for j in range(block_img.shape[1]):
+            b = dct(dct(block_img[i, j].T, norm='ortho').T, norm='ortho')
+            #b = np.average(b)
+            img[i * block_size: (i + 1) * block_size, j * block_size: (j + 1) * block_size] = b
+            #img[i, j] = b
+
+    return img
+
+"""
+# path = '../output_data/edge_detection/tunnel_sequence/canny'
+img0089 = lm(cv2.imread('../input_data/cleaned_gray_tunnel_sequence/0089.png'))
+img0089 = slice_bit_planes(img0089, 5)
+img0096 = lm(cv2.imread('../input_data/cleaned_gray_tunnel_sequence/0096.png'))
+img0096 = slice_bit_planes(img0096, 5)
+blurmap0089 = dct_motion_blur_detection(img0089, block_size=16)
+blurmap0089 = stretch_histogram(blurmap0089)
+blurmap0096 = dct_motion_blur_detection(img0096, block_size=16)
+blurmap0096 = stretch_histogram(blurmap0096)
+diff_blurmaps = stretch_histogram(blurmap0089 - blurmap0096)
+diff_blurmaps = np.where(diff_blurmaps > 180, 255, 0)
+
+diff_blurmaps = dilation(diff_blurmaps, selem=np.ones((21,21)))
+diff_blurmaps = closing(diff_blurmaps, selem=np.ones((11,11)))
+diff_blurmaps = dilation(diff_blurmaps, selem=np.ones((11,11)))
+diff_blurmaps = closing(diff_blurmaps, selem=np.ones((11,11)))
+# diff_blurmaps = dilation(diff_blurmaps, selem=np.ones((11,11)))
+diff_blurmaps = closing(diff_blurmaps, selem=np.ones((11,11)))
+diff_blurmaps = dilation(diff_blurmaps, selem=np.ones((17,17)))
+cv2.imwrite('../output_data/test_output/dct_blur_0089.png', blurmap0089)
+cv2.imwrite('../output_data/test_output/dct_blur_0096.png', blurmap0096)
+cv2.imwrite('../output_data/test_output/dct_diff_blurmap.png', diff_blurmaps)
+"""
 
 """
 img = lm(cv2.imread('../output_data/deblur/local/gray_tunnel_1.png'))
