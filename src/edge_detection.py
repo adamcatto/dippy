@@ -494,9 +494,11 @@ def motion_segment_morphology(frame0, frame1):
     sobel_edges1 = np.where(sobel_edges1 > 10, 1, 0)
     sobel_diff = sobel_edges1 - sobel_edges0
 
-    sobel_diff = erosion(sobel_diff, np.ones((3,3)))
+    # sobel_diff = erosion(sobel_diff, np.ones((3,3)))
     #sobel_diff = erosion(sobel_diff, selem=np.ones((3,3)))
-    sobel_diff = erosion(sobel_diff, selem=np.ones((5,5)))
+    # sobel_diff = erosion(sobel_diff, selem=np.ones((5,5)))
+    sobel_diff = opening(sobel_diff, selem=np.ones((7,7)))
+    """
     sobel_diff = dilation(sobel_diff, selem=np.ones((11,11)))
     sobel_diff = dilation(sobel_diff, selem=np.ones((11,11)))
     sobel_diff = dilation(sobel_diff, selem=np.ones((3,3)))
@@ -505,6 +507,12 @@ def motion_segment_morphology(frame0, frame1):
     sobel_diff = dilation(sobel_diff, selem=np.ones((9,9)))
     sobel_diff = closing(sobel_diff, selem=np.ones((11,11)))
     sobel_diff = closing(sobel_diff, np.ones((15,15)))
+    """
+    sobel_diff = closing(sobel_diff, selem=np.ones((41,41)))
+    sobel_diff = dilation(sobel_diff, selem=np.ones((25,25)))
+    sobel_diff = closing(sobel_diff, selem=np.ones((1,27)))
+    sobel_diff = closing(sobel_diff, selem=np.ones((27,1)))
+    #sobel_diff = closing(sobel_diff, selem=np.ones((25,25)))
     r = sobel_diff.astype(int) * 255
     return r
 
@@ -553,7 +561,6 @@ def motion_segment_morphology_batch(img_dir, num_frames, num_prev_frames):
     for i, d in tqdm(enumerate(seg_diffs)):
         cv2.imwrite('../output_data/edge_detection/tunnel_sequence/morphology_diffs/' + files[i + num_prev_frames], d)
         cv2.imwrite('../output_data/edge_detection/tunnel_sequence/morphology_seg_combos/' + files[i + num_prev_frames], seg_diffs[i])
-
 
 
 def make_montages(original_path, processed_path, out_dir):
